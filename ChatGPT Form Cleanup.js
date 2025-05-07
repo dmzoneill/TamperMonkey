@@ -108,6 +108,69 @@
         }
     }
 
+    function addThreadChatButton() {
+        const threadDialog = document.querySelector("div.p-view_contents.p-view_contents--secondary[aria-label*='Thread in channel']");
+        if (!threadDialog) return;
+
+        const existingChatButtons = document.querySelectorAll(".chatgpt-cleanup-button");
+        if (existingChatButtons.length < 2) return;
+
+        const targetButton = existingChatButtons[1];
+        if (!targetButton || targetButton.nextSibling?.classList?.contains("thread-chat-icon-button")) return;
+
+        const newButton = document.createElement("button");
+        newButton.className = "thread-chat-icon-button";
+        newButton.setAttribute("aria-label", "Summarize Thread");
+        newButton.setAttribute("type", "button");
+        newButton.textContent = "💬";
+        newButton.style.marginLeft = "5px";
+        newButton.style.cursor = "pointer";
+
+        targetButton.parentNode.insertBefore(newButton, targetButton.nextSibling);
+
+        newButton.addEventListener("click", async () => {
+            const richTextSections = threadDialog.querySelectorAll(".p-rich_text_section");
+            const texts = Array.from(richTextSections).map(el => el.innerText.trim()).filter(Boolean);
+            const combinedText = texts.join("\n\n");
+
+            console.log("[Thread Extracted Texts]", combinedText);
+
+            let systemPrompt = "You are a summarization and analysis assistant.";
+            systemPrompt += "The user will send you a chunk of text that represents a chat log. The text may contain informal or fragmented sentences.";
+            systemPrompt += "Your job is to analyze the chat, then return a slim, well-formatted response with the following three sections:";
+            systemPrompt += "Summary – one or two short bullet points that explain what the conversation is mainly about.";
+            systemPrompt += "Key Points – a list of clear, useful bullet points summarizing what was discussed or agreed upon.";
+            systemPrompt += "Unanswered Questions – bullet points listing any unresolved questions or issues that were raised but not answered.";
+            systemPrompt += "Formatting instructions:";
+            systemPrompt += "Use bold to label each section, but do not use headings or titles.";
+            systemPrompt += "Use bullet points (•) for each item.";
+            systemPrompt += "Keep language professional, clear, and to the point.Read all this text. Summarize it.";
+            systemPrompt += "Respond in html, put each line in its own paragraph <p></p>";
+
+            const userPrompt = combinedText;
+
+            try {
+                const summary = await sendToOpenAI(userPrompt, systemPrompt, "{text}");
+                console.log("[Thread Summary]", summary);
+
+                // Find the Slack reply editor
+                const replyEditor = document.querySelector(".ql-editor[aria-label^='Reply to thread']");
+                if (!replyEditor) {
+                    alert("Could not find the reply editor.");
+                    return;
+                }
+
+                replyEditor.innerHTML = `<p>${summary.replace(/\n/g, "<br>")}</p>`;
+                alert("Summary added to the reply editor.");
+            } catch (err) {
+                console.error("Failed to summarize:", err);
+                alert("Error occurred while summarizing thread.");
+            }
+        });
+    }
+
+
+
     function addChatGPTButton() {
         const hostname = window.location.hostname;
 
@@ -155,6 +218,7 @@
             chatGPTButton.setAttribute("type", "button");
             chatGPTButton.dataset.editorSelector = associatedEditorSelector;
             chatGPTButton.textContent = "✏️";
+            chatGPTButton.style.marginLeft = "5px";
             existingButton.parentNode.insertBefore(chatGPTButton, existingButton.nextSibling);
             logDebug("Button inserted into the page");
 
@@ -237,10 +301,13 @@
     const observer = new MutationObserver(() => {
         logDebug("MutationObserver triggered, checking for buttons");
         addChatGPTButton();
+        addThreadChatButton();
+
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
 
     logDebug("Initial button check");
     addChatGPTButton();
+    addThreadChatButton();
 })();
