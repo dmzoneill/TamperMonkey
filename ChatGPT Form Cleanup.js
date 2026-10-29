@@ -193,7 +193,7 @@
       systemPrompt +=
         "Keep language professional, clear, and to the point.Read all this text. Summarize it.";
       systemPrompt +=
-        "Respond in html, put each line in its own paragraph <p></p>";
+        "Respond in html, wrapping each line in its own paragraph (p) element";
 
       const userPrompt = combinedText;
 
@@ -257,7 +257,7 @@
       }
 
       const associatedEditorSelector =
-        config.editors[index] || config.editors[0];
+        config.editors.at(index) || config.editors[0];
       logDebug(`Assigning button to editor: ${associatedEditorSelector}`);
 
       const chatGPTButton = document.createElement("button");
