@@ -10,6 +10,16 @@
 // @grant        none
 // ==/UserScript==
 
+// Only allow requests to the current GitLab origin over HTTPS
+function isAllowedUrl(url) {
+    try {
+        const u = new URL(url, window.location.origin);
+        return u.protocol === "https:" && u.origin === window.location.origin;
+    } catch (e) {
+        return false;
+    }
+}
+
 async function RHOTPGHLoaded() {
     // Find all links with the text "Update dependency"
     const links = [...document.querySelectorAll('a')]
@@ -27,6 +37,10 @@ async function RHOTPGHLoaded() {
 
     // Function to fetch CSRF token from a GitLab MR page
     const getCsrfToken = async (mrPageUrl) => {
+        if (!isAllowedUrl(mrPageUrl)) {
+            console.error(`Refusing to fetch untrusted URL: ${mrPageUrl}`);
+            return null;
+        }
         try {
             const response = await fetch(mrPageUrl, {
                 method: "GET",
@@ -65,6 +79,11 @@ async function RHOTPGHLoaded() {
             const csrfToken = await getCsrfToken(mrPageUrl);
             if (!csrfToken) {
                 console.error(`Could not retrieve CSRF token for: ${mrPageUrl}`);
+                return;
+            }
+
+            if (!isAllowedUrl(apiUrl)) {
+                console.error(`Refusing to call untrusted URL: ${apiUrl}`);
                 return;
             }
 

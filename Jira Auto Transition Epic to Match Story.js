@@ -53,7 +53,7 @@
     }
 
     async function getEpicStatus(epicId, atlToken) {
-        const url = `https://issues.redhat.com/rest/api/2/issue/${epicId}?fields=status&atl_token=${atlToken}`;
+        const url = `https://issues.redhat.com/rest/api/2/issue/${encodeURIComponent(epicId)}?fields=status&atl_token=${encodeURIComponent(atlToken)}`;
 
         try {
             const response = await fetch(url, {
