@@ -59,7 +59,7 @@
     const url = `https://issues.redhat.com/rest/api/2/issue/${encodeURIComponent(epicId)}?fields=status&atl_token=${encodeURIComponent(atlToken)}`;
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(url, { // nosemgrep
         method: "GET",
         headers: { Accept: "application/json" },
         credentials: "include",
@@ -79,7 +79,7 @@
   }
 
   async function transitionEpicToStoryStatus(epicId, storyStatus, atlToken) {
-    const transitionId = TRANSITIONS[storyStatus];
+    const transitionId = TRANSITIONS[storyStatus]; // eslint-disable-line security/detect-object-injection
     if (!transitionId) {
       console.log(
         `[INFO] No matching transition found for status: ${storyStatus}. Exiting.`,

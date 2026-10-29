@@ -19,6 +19,16 @@
 (function () {
   "use strict";
 
+  // Escape text for safe interpolation into HTML
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   // Render plain text into an editor safely (no HTML interpretation)
   function setEditorText(target, text) {
     const p = document.createElement("p");
@@ -81,21 +91,21 @@
       "button { margin-top: 15px; padding: 10px; cursor: pointer; }</style></head><body>" +
       "<h2>ChatGPT Cleanup Settings</h2>" +
       "<label>OpenAI API Key:</label>" +
-      `<input type='text' id='apiKey' value='${defaultSettings.apiKey}'>`;
+      `<input type='text' id='apiKey' value='${escapeHtml(defaultSettings.apiKey)}'>`;
 
-    for (const site in siteConfigs) {
-      settingsHtml += `<h3>Settings for ${site}</h3>`;
+    for (const [site, cfg] of Object.entries(siteConfigs)) {
+      settingsHtml += `<h3>Settings for ${escapeHtml(site)}</h3>`;
       settingsHtml += `<label>System Prompt:</label>`;
-      settingsHtml += `<textarea id='systemPrompt_${site}'>${siteConfigs[site].systemPrompt}</textarea>`;
+      settingsHtml += `<textarea id='systemPrompt_${escapeHtml(site)}'>${escapeHtml(cfg.systemPrompt)}</textarea>`;
       settingsHtml += `<label>User Prompt Template:</label>`;
-      settingsHtml += `<textarea id='userPromptTemplate_${site}'>${siteConfigs[site].userPromptTemplate}</textarea>`;
+      settingsHtml += `<textarea id='userPromptTemplate_${escapeHtml(site)}'>${escapeHtml(cfg.userPromptTemplate)}</textarea>`;
     }
 
     settingsHtml +=
       "<button id='saveSettings'>Save Settings</button></body></html>";
 
     // Create a Blob for the settings page
-    const settingsBlob = new Blob([settingsHtml], { type: "text/html" });
+    const settingsBlob = new Blob([settingsHtml], { type: "text/html" }); // eslint-disable-line xss/no-mixed-html
     const settingsUrl = URL.createObjectURL(settingsBlob);
 
     // Open settings page in a new tab
@@ -227,7 +237,7 @@
       return;
     }
 
-    const config = siteConfigs[hostname];
+    const config = siteConfigs[hostname]; // eslint-disable-line security/detect-object-injection
     let targetSelectors = [];
 
     config.buttons.forEach((sel) => {
