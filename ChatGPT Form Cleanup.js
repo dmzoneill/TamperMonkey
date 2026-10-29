@@ -14,9 +14,20 @@
 // @grant        GM_registerMenuCommand
 // @run-at       document-end
 // ==/UserScript==
+/* global GM_xmlhttpRequest, GM_setValue, GM_getValue, GM_registerMenuCommand */
 
 (function () {
     "use strict";
+
+    // Render plain text into an editor safely (no HTML interpretation)
+    function setEditorText(target, text) {
+        const p = document.createElement("p");
+        String(text).split("\n").forEach((line, idx) => {
+            if (idx > 0) p.appendChild(document.createElement("br"));
+            p.appendChild(document.createTextNode(line));
+        });
+        target.replaceChildren(p);
+    }
 
     const siteConfigs = {
         "app.slack.com": {
@@ -160,7 +171,7 @@
                     return;
                 }
 
-                replyEditor.innerHTML = `<p>${summary.replace(/\n/g, "<br>")}</p>`;
+                setEditorText(replyEditor, summary);
                 alert("Summary added to the reply editor.");
             } catch (err) {
                 console.error("Failed to summarize:", err);
@@ -256,7 +267,7 @@
                 const cleanedText = await sendToOpenAI(textToClean, systemPrompt, userPromptTemplate);
 
                 logDebug(`Cleaned text received: ${cleanedText}`);
-                editor.innerHTML = `<p>${cleanedText}</p>`;
+                setEditorText(editor, cleanedText);
                 chatGPTButton.disabled = false;
                 chatGPTButton.style.opacity = "1";
             });
