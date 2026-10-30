@@ -40,5 +40,5 @@ function waitForElement(selector) {
 
     waitForElement("#overlap-manager-root").then(function(element) {
         element.parentNode.removeChild(element)
-    });
+    }).catch(console.error);
 })();
