@@ -13,14 +13,14 @@
   "use strict";
 
   // Mapping of states to transition IDs
-  const TRANSITIONS = {
-    New: "61",
-    Refinement: "11",
-    Backlog: "21",
-    "In Progress": "31",
-    "Release Pending": "41",
-    Closed: "51",
-  };
+  const TRANSITIONS = new Map([
+    ["New", "61"],
+    ["Refinement", "11"],
+    ["Backlog", "21"],
+    ["In Progress", "31"],
+    ["Release Pending", "41"],
+    ["Closed", "51"],
+  ]);
 
   function getIssueId() {
     const match = window.location.pathname.match(/AAP-(\d+)/);
@@ -58,12 +58,14 @@
   async function getEpicStatus(epicId, atlToken) {
     const url = `https://issues.redhat.com/rest/api/2/issue/${encodeURIComponent(epicId)}?fields=status&atl_token=${encodeURIComponent(atlToken)}`;
 
+    const options = {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    };
+
     try {
-      const response = await fetch(url, { // nosemgrep
-        method: "GET",
-        headers: { Accept: "application/json" },
-        credentials: "include",
-      });
+      const response = await fetch(url, options); // nosemgrep
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -79,7 +81,7 @@
   }
 
   async function transitionEpicToStoryStatus(epicId, storyStatus, atlToken) {
-    const transitionId = TRANSITIONS[storyStatus]; // eslint-disable-line security/detect-object-injection
+    const transitionId = TRANSITIONS.get(storyStatus);
     if (!transitionId) {
       console.log(
         `[INFO] No matching transition found for status: ${storyStatus}. Exiting.`,
@@ -87,18 +89,20 @@
       return;
     }
 
-    const url = `https://issues.redhat.com/rest/api/2/issue/${epicId}/transitions?atl_token=${atlToken}`;
+    // Host is fixed to issues.redhat.com; path/query parts are URI-encoded.
+    const url = `https://issues.redhat.com/rest/api/2/issue/${encodeURIComponent(epicId)}/transitions?atl_token=${encodeURIComponent(atlToken)}`;
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ transition: { id: transitionId } }),
+    };
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ transition: { id: transitionId } }),
-      });
+      const response = await fetch(url, options); // nosemgrep
 
       if (response.ok) {
         console.log(
