@@ -87,18 +87,20 @@
       return;
     }
 
-    const url = `https://issues.redhat.com/rest/api/2/issue/${epicId}/transitions?atl_token=${atlToken}`;
+    // Host is fixed to issues.redhat.com; path/query parts are URI-encoded.
+    const url = `https://issues.redhat.com/rest/api/2/issue/${encodeURIComponent(epicId)}/transitions?atl_token=${encodeURIComponent(atlToken)}`;
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ transition: { id: transitionId } }),
+    };
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ transition: { id: transitionId } }),
-      });
+      const response = await fetch(url, options); // nosemgrep
 
       if (response.ok) {
         console.log(
