@@ -105,7 +105,7 @@
       "<button id='saveSettings'>Save Settings</button></body></html>";
 
     // Create a Blob for the settings page
-    const settingsBlob = new Blob([settingsHtml], { type: "text/html" }); // eslint-disable-line xss/no-mixed-html
+    const settingsBlob = new Blob([settingsHtml], { type: "text/html" });
     const settingsUrl = URL.createObjectURL(settingsBlob);
 
     // Open settings page in a new tab
@@ -237,7 +237,7 @@
       return;
     }
 
-    const config = siteConfigs[hostname]; // eslint-disable-line security/detect-object-injection
+    const config = siteConfigs[hostname];
     let targetSelectors = [];
 
     config.buttons.forEach((sel) => {

@@ -43,7 +43,8 @@ async function RHOTPGHLoaded() {
       return null;
     }
     try {
-      const response = await fetch(mrPageUrl, { // nosemgrep
+      const response = await fetch(mrPageUrl, {
+        // nosemgrep
         method: "GET",
         credentials: "include",
       });
@@ -95,7 +96,8 @@ async function RHOTPGHLoaded() {
       }
 
       // Send request to close the MR
-      const response = await fetch(apiUrl, { // nosemgrep
+      const response = await fetch(apiUrl, {
+        // nosemgrep
         method: "PUT",
         headers: {
           accept: "application/json, text/plain, */*",
