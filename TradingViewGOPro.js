@@ -10,35 +10,40 @@
 // ==/UserScript==
 
 function waitForElement(selector) {
-	return new Promise(function(resolve, reject) {
-		var element = document.querySelector(selector);
+  return new Promise(function (resolve) {
+    var element = document.querySelector(selector);
 
-		if(element) {
-			resolve(element);
-			return;
-		}
+    if (element) {
+      resolve(element);
+      return;
+    }
 
-		var observer = new MutationObserver(function(mutations) {
-			mutations.forEach(function(mutation) {
-				var nodes = Array.from(mutation.addedNodes);
-				for(var node of nodes) {
-					if(node.matches && node.matches(selector)) {
-						observer.disconnect();
-						resolve(node);
-						return;
-					}
-				};
-			});
-		});
+    var observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        var nodes = Array.from(mutation.addedNodes);
+        for (var node of nodes) {
+          if (node.matches && node.matches(selector)) {
+            observer.disconnect();
+            resolve(node);
+            return;
+          }
+        }
+      });
+    });
 
-		observer.observe(document.documentElement, { childList: true, subtree: true });
-	});
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+  });
 }
 
-(function() {
-    'use strict';
+(function () {
+  "use strict";
 
-    waitForElement("#overlap-manager-root").then(function(element) {
-        element.parentNode.removeChild(element)
-    }).catch(console.error);
+  waitForElement("#overlap-manager-root")
+    .then(function (element) {
+      element.parentNode.removeChild(element);
+    })
+    .catch(console.error);
 })();
