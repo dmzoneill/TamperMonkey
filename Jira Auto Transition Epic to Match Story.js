@@ -22,6 +22,15 @@
     Closed: "51",
   };
 
+  function getOwnValue(map, key) {
+    for (const [entryKey, entryValue] of Object.entries(map)) {
+      if (entryKey === key) {
+        return entryValue;
+      }
+    }
+    return undefined;
+  }
+
   function getIssueId() {
     const match = window.location.pathname.match(/AAP-(\d+)/);
     return match ? match[0] : null;
@@ -80,7 +89,7 @@
   }
 
   async function transitionEpicToStoryStatus(epicId, storyStatus, atlToken) {
-    const transitionId = TRANSITIONS[storyStatus];
+    const transitionId = getOwnValue(TRANSITIONS, storyStatus);
     if (!transitionId) {
       console.log(
         `[INFO] No matching transition found for status: ${storyStatus}. Exiting.`,
