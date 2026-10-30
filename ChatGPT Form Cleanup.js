@@ -20,16 +20,15 @@
   "use strict";
 
   // Escape text for safe interpolation into HTML
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+  function getOwnValue(map, key) {
+    for (const [entryKey, entryValue] of Object.entries(map)) {
+      if (entryKey === key) {
+        return entryValue;
+      }
+    }
+    return undefined;
   }
 
-  // Render plain text into an editor safely (no HTML interpretation)
   function setEditorText(target, text) {
     const p = document.createElement("p");
     String(text)
@@ -81,69 +80,89 @@
     console.info(`[ChatGPT-Button] ${message}`);
   }
 
-  // Function to open the settings page
+  // Function to open the settings page (DOM APIs only — no HTML string blobs)
   function openSettingsPage() {
-    let settingsHtml =
-      "<html><head><title>ChatGPT Cleanup Settings</title>" +
-      "<style>body { font-family: Arial, sans-serif; padding: 20px; }" +
+    const settingsWindow = window.open("about:blank", "_blank");
+    if (!settingsWindow) {
+      return;
+    }
+
+    const doc = settingsWindow.document;
+    doc.title = "ChatGPT Cleanup Settings";
+
+    const style = doc.createElement("style");
+    style.textContent =
+      "body { font-family: Arial, sans-serif; padding: 20px; }" +
       "label { display: block; margin-top: 10px; font-weight: bold; }" +
       "input, textarea { width: 100%; padding: 5px; margin-top: 5px; }" +
-      "button { margin-top: 15px; padding: 10px; cursor: pointer; }</style></head><body>" +
-      "<h2>ChatGPT Cleanup Settings</h2>" +
-      "<label>OpenAI API Key:</label>" +
-      `<input type='text' id='apiKey' value='${escapeHtml(defaultSettings.apiKey)}'>`;
+      "button { margin-top: 15px; padding: 10px; cursor: pointer; }";
+    doc.head.appendChild(style);
+
+    const heading = doc.createElement("h2");
+    heading.textContent = "ChatGPT Cleanup Settings";
+    doc.body.appendChild(heading);
+
+    const apiKeyLabel = doc.createElement("label");
+    apiKeyLabel.textContent = "OpenAI API Key:";
+    doc.body.appendChild(apiKeyLabel);
+
+    const apiKeyInput = doc.createElement("input");
+    apiKeyInput.type = "text";
+    apiKeyInput.id = "apiKey";
+    apiKeyInput.value = defaultSettings.apiKey;
+    doc.body.appendChild(apiKeyInput);
 
     for (const [site, cfg] of Object.entries(siteConfigs)) {
-      settingsHtml += `<h3>Settings for ${escapeHtml(site)}</h3>`;
-      settingsHtml += `<label>System Prompt:</label>`;
-      settingsHtml += `<textarea id='systemPrompt_${escapeHtml(site)}'>${escapeHtml(cfg.systemPrompt)}</textarea>`;
-      settingsHtml += `<label>User Prompt Template:</label>`;
-      settingsHtml += `<textarea id='userPromptTemplate_${escapeHtml(site)}'>${escapeHtml(cfg.userPromptTemplate)}</textarea>`;
+      const siteHeading = doc.createElement("h3");
+      siteHeading.textContent = "Settings for " + site;
+      doc.body.appendChild(siteHeading);
+
+      const systemLabel = doc.createElement("label");
+      systemLabel.textContent = "System Prompt:";
+      doc.body.appendChild(systemLabel);
+
+      const systemArea = doc.createElement("textarea");
+      systemArea.id = "systemPrompt_" + site;
+      systemArea.value = cfg.systemPrompt;
+      doc.body.appendChild(systemArea);
+
+      const userLabel = doc.createElement("label");
+      userLabel.textContent = "User Prompt Template:";
+      doc.body.appendChild(userLabel);
+
+      const userArea = doc.createElement("textarea");
+      userArea.id = "userPromptTemplate_" + site;
+      userArea.value = cfg.userPromptTemplate;
+      doc.body.appendChild(userArea);
     }
 
-    settingsHtml +=
-      "<button id='saveSettings'>Save Settings</button></body></html>";
+    const saveButton = doc.createElement("button");
+    saveButton.id = "saveSettings";
+    saveButton.type = "button";
+    saveButton.textContent = "Save Settings";
+    doc.body.appendChild(saveButton);
 
-    // Create a Blob for the settings page
-    const settingsBlob = new Blob([settingsHtml], { type: "text/html" }); // eslint-disable-line xss/no-mixed-html
-    const settingsUrl = URL.createObjectURL(settingsBlob);
+    const siteKeys = Object.keys(siteConfigs);
+    saveButton.addEventListener("click", function () {
+      const apiKey = apiKeyInput.value;
+      localStorage.setItem("chatgpt_apiKey", apiKey);
 
-    // Open settings page in a new tab
-    const settingsWindow = window.open(settingsUrl, "_blank");
+      for (const site of siteKeys) {
+        const systemEl = doc.getElementById("systemPrompt_" + site);
+        const userEl = doc.getElementById("userPromptTemplate_" + site);
+        if (systemEl) {
+          localStorage.setItem("chatgpt_systemPrompt_" + site, systemEl.value);
+        }
+        if (userEl) {
+          localStorage.setItem(
+            "chatgpt_userPromptTemplate_" + site,
+            userEl.value,
+          );
+        }
+      }
 
-    if (settingsWindow) {
-      // Wait for settings page to load before injecting script
-      setTimeout(() => {
-        const scriptContent = `
-                document.getElementById('saveSettings').addEventListener('click', function() {
-                    const apiKey = document.getElementById('apiKey').value;
-                    localStorage.setItem('chatgpt_apiKey', apiKey);
-
-                    ${Object.keys(siteConfigs)
-                      .map(
-                        (site) => `
-                        localStorage.setItem('chatgpt_systemPrompt_${site}', document.getElementById('systemPrompt_${site}').value);
-                        localStorage.setItem('chatgpt_userPromptTemplate_${site}', document.getElementById('userPromptTemplate_${site}').value);
-                    `,
-                      )
-                      .join("")}
-
-                    alert('Settings saved. Refresh to apply changes.');
-                });
-            `;
-
-        // Create a Blob for the JavaScript
-        const scriptBlob = new Blob([scriptContent], {
-          type: "application/javascript",
-        });
-        const scriptUrl = URL.createObjectURL(scriptBlob);
-
-        // Create and append the script element
-        const scriptElement = settingsWindow.document.createElement("script");
-        scriptElement.src = scriptUrl;
-        settingsWindow.document.body.appendChild(scriptElement);
-      }, 500);
-    }
+      settingsWindow.alert("Settings saved. Refresh to apply changes.");
+    });
   }
 
   function addThreadChatButton() {
@@ -232,12 +251,12 @@
   function addChatGPTButton() {
     const hostname = window.location.hostname;
 
-    if (!(hostname in siteConfigs)) {
+    const config = getOwnValue(siteConfigs, hostname);
+    if (!config) {
       logDebug(`No configuration found for this site: ${hostname}`);
       return;
     }
 
-    const config = siteConfigs[hostname]; // eslint-disable-line security/detect-object-injection
     let targetSelectors = [];
 
     config.buttons.forEach((sel) => {
