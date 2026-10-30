@@ -10,9 +10,11 @@
 // @grant        none
 // ==/UserScript==
 
-const GITLAB_ORIGIN = "https://gitlab.cee.redhat.com";
+const ALLOWED_ORIGINS = ["https://gitlab.cee.redhat.com"];
 const MR_PATH_RE =
   /^\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/-\/merge_requests\/(\d+)\/?$/;
+const MR_API_PATH_RE =
+  /^\/api\/v4\/projects\/[A-Za-z0-9_.%-]+\/merge_requests\/\d+$/;
 
 /**
  * Parse a candidate href into trusted GitLab MR path parts, or null.
@@ -21,11 +23,14 @@ const MR_PATH_RE =
 function parseMrParts(href) {
   let parsed;
   try {
-    parsed = new URL(href, GITLAB_ORIGIN);
+    parsed = new URL(href, "https://gitlab.cee.redhat.com");
   } catch {
     return null;
   }
-  if (parsed.protocol !== "https:" || parsed.origin !== GITLAB_ORIGIN) {
+  if (
+    parsed.protocol !== "https:" ||
+    !ALLOWED_ORIGINS.includes(parsed.origin)
+  ) {
     return null;
   }
   const match = parsed.pathname.match(MR_PATH_RE);
@@ -37,8 +42,7 @@ function parseMrParts(href) {
 
 function mrPageUrl(parts) {
   return (
-    GITLAB_ORIGIN +
-    "/" +
+    "https://gitlab.cee.redhat.com/" +
     parts.namespace +
     "/" +
     parts.project +
@@ -52,8 +56,7 @@ function mrApiUrl(parts) {
     parts.namespace + "/" + parts.project,
   );
   return (
-    GITLAB_ORIGIN +
-    "/api/v4/projects/" +
+    "https://gitlab.cee.redhat.com/api/v4/projects/" +
     encodedProject +
     "/merge_requests/" +
     parts.mrId
@@ -72,68 +75,96 @@ async function RHOTPGHLoaded() {
 
   const getCsrfToken = async (parts) => {
     const pageUrl = mrPageUrl(parts);
+    let parsed;
     try {
-      const response = await fetch(pageUrl, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        console.error(
-          `Failed to fetch MR page: ${pageUrl} - ${response.statusText}`,
-        );
-        return null;
-      }
-
-      const pageText = await response.text();
-      const csrfMatch = pageText.match(
-        /<meta name="csrf-token" content="([^"]+)"/,
-      );
-
-      return csrfMatch ? csrfMatch[1] : null;
-    } catch (error) {
-      console.error(`Error fetching CSRF token from ${pageUrl}:`, error);
+      parsed = new URL(pageUrl);
+    } catch {
       return null;
     }
+    if (ALLOWED_ORIGINS.includes(parsed.origin)) {
+      if (!MR_PATH_RE.test(parsed.pathname)) {
+        console.error(`Refusing unexpected MR page path: ${pageUrl}`);
+        return null;
+      }
+      try {
+        const response = await fetch(pageUrl, {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          console.error(
+            `Failed to fetch MR page: ${pageUrl} - ${response.statusText}`,
+          );
+          return null;
+        }
+
+        const pageText = await response.text();
+        const csrfMatch = pageText.match(
+          /<meta name="csrf-token" content="([^"]+)"/,
+        );
+
+        return csrfMatch ? csrfMatch[1] : null;
+      } catch (error) {
+        console.error(`Error fetching CSRF token from ${pageUrl}:`, error);
+        return null;
+      }
+    }
+    console.error(`Refusing non-allowlisted MR page URL: ${pageUrl}`);
+    return null;
   };
 
   const closeMergeRequest = async (parts, linkElement) => {
     const pageUrl = mrPageUrl(parts);
     const apiUrl = mrApiUrl(parts);
+    let parsedApi;
     try {
-      const csrfToken = await getCsrfToken(parts);
-      if (!csrfToken) {
-        console.error(`Could not retrieve CSRF token for: ${pageUrl}`);
+      parsedApi = new URL(apiUrl);
+    } catch {
+      return;
+    }
+    if (ALLOWED_ORIGINS.includes(parsedApi.origin)) {
+      if (!MR_API_PATH_RE.test(parsedApi.pathname)) {
+        console.error(`Refusing unexpected MR API path: ${apiUrl}`);
         return;
       }
-
-      const response = await fetch(apiUrl, {
-        method: "PUT",
-        headers: {
-          accept: "application/json, text/plain, */*",
-          "content-type": "application/json",
-          "x-csrf-token": csrfToken,
-          "x-requested-with": "XMLHttpRequest",
-        },
-        body: JSON.stringify({ state_event: "close" }),
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        console.log(`Closed MR: ${pageUrl}`);
-
-        const mergeRequestElement = linkElement.closest(".merge-request");
-        if (mergeRequestElement) {
-          mergeRequestElement.remove();
-          console.log(`Removed MR element from DOM: ${pageUrl}`);
+      try {
+        const csrfToken = await getCsrfToken(parts);
+        if (!csrfToken) {
+          console.error(`Could not retrieve CSRF token for: ${pageUrl}`);
+          return;
         }
-      } else {
-        const errorText = await response.text();
-        console.error(`Failed to close MR: ${pageUrl}`, errorText);
+
+        const response = await fetch(apiUrl, {
+          method: "PUT",
+          headers: {
+            accept: "application/json, text/plain, */*",
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken,
+            "x-requested-with": "XMLHttpRequest",
+          },
+          body: JSON.stringify({ state_event: "close" }),
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          console.log(`Closed MR: ${pageUrl}`);
+
+          const mergeRequestElement = linkElement.closest(".merge-request");
+          if (mergeRequestElement) {
+            mergeRequestElement.remove();
+            console.log(`Removed MR element from DOM: ${pageUrl}`);
+          }
+        } else {
+          const errorText = await response.text();
+          console.error(`Failed to close MR: ${pageUrl}`, errorText);
+        }
+      } catch (error) {
+        console.error(`Error closing MR: ${pageUrl}`, error);
       }
-    } catch (error) {
-      console.error(`Error closing MR: ${pageUrl}`, error);
+      return;
     }
+    console.error(`Refusing non-allowlisted MR API URL: ${apiUrl}`);
   };
 
   for (const linkElement of links) {
